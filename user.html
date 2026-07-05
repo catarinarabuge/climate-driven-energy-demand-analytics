@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Previsão - Energy Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#f0fdf4', 500: '#10b981', 600: '#059669', 900: '#064e3b' },
+                        energy: { 500: '#3b82f6', 600: '#2563eb' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Feature chip */
+        .feature-chip {
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+        .feature-chip:hover { transform: translateY(-1px); }
+        .feature-chip.active {
+            background-color: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+        }
+        .feature-chip.active .chip-icon { color: white; }
+
+        /* Feature input card animation */
+        .feature-input-card {
+            animation: slideIn 0.2s ease;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Day-of-week buttons */
+        .dow-btn { transition: all 0.12s ease; }
+        .dow-btn.active { background-color: #3b82f6; color: white; border-color: #3b82f6; }
+
+        /* Season buttons */
+        .season-btn { transition: all 0.12s ease; }
+        .season-btn.active { background-color: #10b981; color: white; border-color: #10b981; }
+
+        /* Toggle switch */
+        .toggle-track {
+            transition: background-color 0.2s;
+        }
+        .toggle-thumb {
+            transition: transform 0.2s;
+        }
+
+        /* Slider custom */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: #e5e7eb;
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        }
+        input[type=range].green::-webkit-slider-thumb { background: #10b981; }
+
+        /* Tooltip */
+        .tooltip-trigger { position: relative; }
+        .tooltip-box {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1f2937;
+            color: white;
+            font-size: 11px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            width: 200px;
+            text-align: center;
+            z-index: 50;
+            white-space: normal;
+            line-height: 1.4;
+        }
+        .tooltip-box::after {
+            content: '';
+            position: absolute;
+            top: 100%; left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: #1f2937;
+        }
+        .tooltip-trigger:hover .tooltip-box { display: block; }
+
+        /* Quick preset buttons for sliders */
+        .preset-btn {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #d1d5db;
+            background: white;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        .preset-btn:hover { background: #f3f4f6; }
+        .preset-btn.active-preset { background: #eff6ff; border-color: #3b82f6; color: #2563eb; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+
+    <!-- Header (inalterado) -->
+    <header class="bg-white shadow-sm sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-3">
+                    <div class="bg-brand-500 text-white p-2 rounded-lg">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-xl text-gray-900 leading-tight">Energy Analytics</h1>
+                        <p class="text-xs text-gray-500">PIACD 2025/2026 • UC DEI</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                        <i class="fa-solid fa-user mr-1 text-energy-500"></i>{{ session.user }}
+                    </span>
+                    <a href="/logout" class="text-gray-600 hover:text-red-600 font-medium transition-colors">Sair</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero (inalterado) -->
+    <section class="bg-brand-900 text-white py-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-2xl md:text-3xl font-extrabold mb-2">Painel de Previsão</h2>
+            <p class="text-brand-50 text-base">Configure um cenário com as features que pretende e obtenha a estimativa de carga na rede.</p>
+        </div>
+    </section>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
+        <!-- ─── STEP 1: Seleção de features ─── -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 mb-6">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xl font-bold text-gray-900 flex items-center">
+                    <i class="fa-solid fa-sliders text-energy-500 mr-2"></i>
+                    Passo 1 — Escolha as features do cenário
+                </h3>
+                <div class="flex gap-2">
+                    <button onclick="selectAll()" class="text-xs text-energy-500 hover:underline font-medium">Selecionar todas</button>
+                    <span class="text-gray-300">|</span>
+                    <button onclick="clearAll()" class="text-xs text-gray-400 hover:underline font-medium">Limpar</button>
+                </div>
+            </div>
+            <p class="text-sm text-gray-500 mb-6">Clique nas features que quer definir. As restantes serão preenchidas com valores médios históricos.</p>
+
+            <!-- Grupo Temporal -->
+            <div class="mb-5">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+                    <i class="fa-solid fa-clock mr-1"></i> Contexto Temporal
+                </p>
+                <div class="flex flex-wrap gap-2">
+                    <button class="feature-chip border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 bg-white" data-feature="season" onclick="toggleChip(this)">
+                        <span class="chip-icon text-gray-400"><i class="fa-solid fa-leaf"></i></span> Estação do Ano
+                    </button>
+                    <button class="feature-chip border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 bg-white" data-feature="month" onclick="toggleChip(this)">
+                        <span class="chip-icon text-gray-400"><i class="fa-solid fa-calendar"></i></span> Mês
+                    </button>
+                    <button class="feature-chip border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 bg-white" data-feature="day" onclick="toggleChip(this)">
+                        <span class="chip-icon text-gray-400"><i class="fa-solid fa-calendar-day"></i></span> Dia do Mês
+                    </button>
+                    <button class="feature-chip border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 bg-white" data-feature="day_of_week" onclick="toggleChip(this)">
+                        <span class="chip-icon text-gray-400"><i class="fa-solid fa-calendar-week"></i></span> Dia da Semana
+                    </button>
+                    <button class="feature-chip border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 bg-white" data-feature="hour" onclick="toggleChip(this)">
+                        <span class="chip-icon text-gray-400"><i class="fa-solid fa-clock"></i></span> Hora
+                    </button>
+                    <button class="feature-chip border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 bg-white" data-feature="is_weekend" onclick="toggleChip(this)">
+                        <span class="chip-icon text-gray-400"><i class="fa-solid fa-umbrella-beach"></i></span> Fim de Semana
+                    </button>
+                </div>
+            </div>
+
+            <!-- Grupo Meteorológico -->
+            <div class="mb-5">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+                    <i class="fa-solid fa-cloud-sun mr-1"></i> Condições Meteorológicas
+                </p>
+                <div class="flex flex-wrap gap-2">
+                    <button class="feature-chip border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 bg-white" data-feature="temperature" onclick="toggleChip(this)">
+                        <span class="chip-icon text-gray-400"><i class="fa-solid fa-temperature-half"></i></span> Temperatura (2m)
+                    </button>
+                    <button class="feature-chip border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 bg-white" data-feature="wind" onclick="toggleChip(this)">
+                        <span class="chip-icon text-gray-400"><i class="fa-solid fa-wind"></i></span> Vento (10m)
+                    </button>
+                    <button class="feature-chip border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 bg-white" data-feature="solar" onclick="toggleChip(this)">
+                        <span class="chip-icon text-gray-400"><i class="fa-solid fa-sun"></i></span> Radiação Solar
+                    </button>
+                    <button class="feature-chip border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 bg-white" data-feature="precipitation" onclick="toggleChip(this)">
+                        <span class="chip-icon text-gray-400"><i class="fa-solid fa-droplet"></i></span> Precipitação
+                    </button>
+                    <button class="feature-chip border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 bg-white" data-feature="temp_roll3h" onclick="toggleChip(this)">
+                        <span class="chip-icon text-gray-400"><i class="fa-solid fa-rotate"></i></span> Temp. Média 3h <span class="ml-1 text-xs text-gray-400 font-normal">(roll)</span>
+                    </button>
+                    <button class="feature-chip border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 bg-white" data-feature="temp_roll24h" onclick="toggleChip(this)">
+                        <span class="chip-icon text-gray-400"><i class="fa-solid fa-rotate"></i></span> Temp. Média 24h <span class="ml-1 text-xs text-gray-400 font-normal">(roll)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Grupo Histórico de Carga -->
+            <div>
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+                    <i class="fa-solid fa-bolt mr-1"></i> Histórico de Carga
+                </p>
+                <div class="flex flex-wrap gap-2">
+                    <button class="feature-chip border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 bg-white" data-feature="lag_1h" onclick="toggleChip(this)">
+                        <span class="chip-icon text-gray-400"><i class="fa-solid fa-history"></i></span> Carga há 1h <span class="ml-1 text-xs text-gray-400 font-normal">(lag)</span>
+                    </button>
+                    <button class="feature-chip border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 bg-white" data-feature="lag_24h" onclick="toggleChip(this)">
+                        <span class="chip-icon text-gray-400"><i class="fa-solid fa-history"></i></span> Carga há 24h <span class="ml-1 text-xs text-gray-400 font-normal">(lag)</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── STEP 2: Inputs dinâmicos ─── -->
+        <div id="inputs-section" class="hidden bg-white rounded-xl shadow-sm border border-gray-100 p-8 mb-6">
+            <h3 class="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fa-solid fa-pen-to-square text-energy-500 mr-2"></i>
+                Passo 2 — Defina os valores do cenário
+            </h3>
+            <div id="inputs-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+
+            <div class="mt-8 pt-6 border-t border-gray-100 flex justify-end">
+                <button onclick="generatePrediction()" class="bg-energy-500 hover:bg-energy-600 text-white font-bold py-3 px-8 rounded-lg transition-colors flex items-center gap-2">
+                    <i class="fa-solid fa-gears"></i> Gerar Previsão
+                </button>
+            </div>
+        </div>
+
+        <!-- ─── STEP 3: Resultados ─── -->
+        <div id="results-section" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+                <!-- Resumo lateral -->
+                <div class="lg:col-span-1 space-y-6">
+                    <!-- Temperatura estimada -->
+                    <div id="temp-card" class="bg-brand-50 rounded-xl shadow-sm border border-brand-100 p-6 hidden">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-brand-900 font-bold">Clima Estimado</h3>
+                            <div class="h-10 w-10 bg-white text-brand-500 rounded-lg flex items-center justify-center text-xl shadow-sm">
+                                <i class="fa-solid fa-temperature-half"></i>
+                            </div>
+                        </div>
+                        <div id="temp-display" class="text-4xl font-extrabold text-brand-600 mb-2">—</div>
+                        <p class="text-sm text-brand-600/80">Dados baseados no ERA5 (Copernicus)</p>
+                    </div>
+
+                    <!-- Resumo energético -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-gray-900 font-bold">Resumo Energético</h3>
+                            <div class="h-10 w-10 bg-blue-50 text-energy-500 rounded-lg flex items-center justify-center text-xl">
+                                <i class="fa-solid fa-bolt"></i>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center border-b border-gray-100 pb-3">
+                                <span class="text-sm text-gray-500">Previsão Pontual</span>
+                                <span id="res-point" class="font-bold text-gray-800">—</span>
+                            </div>
+                            <div class="flex justify-between items-center border-b border-gray-100 pb-3">
+                                <span class="text-sm text-gray-500">Intervalo (90%)</span>
+                                <span id="res-interval" class="font-bold text-gray-800">—</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-500">Confiança</span>
+                                <span id="res-confidence" class="text-sm font-bold text-brand-500 bg-brand-50 px-2 py-1 rounded">—</span>
+                            </div>
+                        </div>
+                        <!-- Features usadas -->
+                        <div class="mt-5 pt-4 border-t border-gray-100">
+                            <p class="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">Features usadas</p>
+                            <div id="used-features-list" class="flex flex-wrap gap-1"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gráfico -->
+                <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-xl font-bold text-gray-900">Curva de Carga Prevista</h3>
+                    </div>
+                    <div style="height:320px;">
+                        <canvas id="predictionChart"></canvas>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script>
+    // ── Estado ──────────────────────────────────────────────────────────
+    const activeFeatures = new Set();
+    let chartInstance = null;
+
+    // Defaults históricos (médias do dataset)
+    const DEFAULTS = {
+        season: 'spring',
+        month: 6,
+        day: 15,
+        day_of_week: 2,
+        hour: 12,
+        is_weekend: 0,
+        temperature: 16.8,
+        wind: 2.6,
+        solar: 200,
+        precipitation: 0.1,
+        temp_roll3h: 16.8,
+        temp_roll24h: 16.8,
+        lag_1h: 6057,
+        lag_24h: 6057
+    };
+
+    // Labels amigáveis
+    const FEATURE_LABELS = {
+        season: 'Estação', month: 'Mês', day: 'Dia', day_of_week: 'Dia semana',
+        hour: 'Hora', is_weekend: 'Fim semana', temperature: 'Temperatura',
+        wind: 'Vento', solar: 'Radiação solar', precipitation: 'Precipitação',
+        temp_roll3h: 'Temp. roll 3h', temp_roll24h: 'Temp. roll 24h',
+        lag_1h: 'Carga lag 1h', lag_24h: 'Carga lag 24h'
+    };
+
+    // ── Toggle chip ───────────────────────────────────────────────────
+    // "season" e "month" são mutuamente exclusivos
+    const MUTUAL_EXCLUSIONS = { season: 'month', month: 'season' };
+
+    function updateMutualExclusion() {
+        const hasSeason = activeFeatures.has('season');
+        const hasMonth  = activeFeatures.has('month');
+        const seasonBtn = document.querySelector('[data-feature="season"]');
+        const monthBtn  = document.querySelector('[data-feature="month"]');
+
+        if (hasSeason) {
+            // bloquear mês
+            monthBtn.disabled = true;
+            monthBtn.classList.add('opacity-40', 'cursor-not-allowed');
+            monthBtn.title = 'Não pode selecionar Mês e Estação do Ano em simultâneo';
+        } else {
+            monthBtn.disabled = false;
+            monthBtn.classList.remove('opacity-40', 'cursor-not-allowed');
+            monthBtn.title = '';
+        }
+
+        if (hasMonth) {
+            // bloquear estação
+            seasonBtn.disabled = true;
+            seasonBtn.classList.add('opacity-40', 'cursor-not-allowed');
+            seasonBtn.title = 'Não pode selecionar Estação do Ano e Mês em simultâneo';
+        } else {
+            seasonBtn.disabled = false;
+            seasonBtn.classList.remove('opacity-40', 'cursor-not-allowed');
+            seasonBtn.title = '';
+        }
+    }
+
+    function toggleChip(el) {
+        if (el.disabled) return;
+        const f = el.dataset.feature;
+        if (activeFeatures.has(f)) {
+            activeFeatures.delete(f);
+            el.classList.remove('active');
+        } else {
+            activeFeatures.add(f);
+            el.classList.add('active');
+        }
+        updateMutualExclusion();
+        renderInputs();
+    }
+
+    function selectAll() {
+        document.querySelectorAll('.feature-chip').forEach(el => {
+            // ao selecionar todas, se "season" já estiver ativa, não ativa "month" e vice-versa
+            if (el.dataset.feature === 'month' && activeFeatures.has('season')) return;
+            if (el.dataset.feature === 'season' && activeFeatures.has('month')) return;
+            if (!el.disabled) {
+                activeFeatures.add(el.dataset.feature);
+                el.classList.add('active');
+            }
+        });
+        updateMutualExclusion();
+        renderInputs();
+    }
+
+    function clearAll() {
+        document.querySelectorAll('.feature-chip').forEach(el => {
+            el.classList.remove('active');
+            el.disabled = false;
+            el.classList.remove('opacity-40', 'cursor-not-allowed');
+            el.title = '';
+        });
+        activeFeatures.clear();
+        document.getElementById('inputs-section').classList.add('hidden');
+    }
+
+    // ── Render inputs ─────────────────────────────────────────────────
+    function renderInputs() {
+        const section = document.getElementById('inputs-section');
+        const grid = document.getElementById('inputs-grid');
+        if (activeFeatures.size === 0) { section.classList.add('hidden'); return; }
+        section.classList.remove('hidden');
+        grid.innerHTML = '';
+        activeFeatures.forEach(f => {
+            const card = buildCard(f);
+            grid.appendChild(card);
+        });
+    }
+
+    function buildCard(feature) {
+        const div = document.createElement('div');
+        div.className = 'feature-input-card bg-gray-50 rounded-xl border border-gray-200 p-5';
+
+        switch(feature) {
+            case 'season':      div.innerHTML = buildSeason(); break;
+            case 'month':       div.innerHTML = buildMonth(); break;
+            case 'day':         div.innerHTML = buildDay(); break;
+            case 'day_of_week': div.innerHTML = buildDow(); break;
+            case 'hour':        div.innerHTML = buildHour(); break;
+            case 'is_weekend':  div.innerHTML = buildWeekend(); break;
+            case 'temperature': div.innerHTML = buildSlider('temperature','Temperatura (2m)','°C',5,32,16.8,'green','fa-temperature-half'); break;
+            case 'wind':        div.innerHTML = buildSlider('wind','Vento (10m v-comp.)','m/s',0,10,2.5,'','fa-wind'); break;
+            case 'solar':       div.innerHTML = buildSolar(); break;
+            case 'precipitation': div.innerHTML = buildPrecip(); break;
+            case 'temp_roll3h': div.innerHTML = buildNumericInput('temp_roll3h','Temp. Média 3h (roll)','°C',DEFAULTS.temp_roll3h,'Média da temperatura das últimas 3 horas. Podes usar o mesmo valor da Temperatura se não souberes.'); break;
+            case 'temp_roll24h':div.innerHTML = buildNumericInput('temp_roll24h','Temp. Média 24h (roll)','°C',DEFAULTS.temp_roll24h,'Média da temperatura das últimas 24 horas.'); break;
+            case 'lag_1h':      div.innerHTML = buildNumericInput('lag_1h','Carga há 1 hora (lag)','MW',DEFAULTS.lag_1h,'Consumo verificado na hora anterior. Default = média histórica (6057 MW).'); break;
+            case 'lag_24h':     div.innerHTML = buildNumericInput('lag_24h','Carga há 24 horas (lag)','MW',DEFAULTS.lag_24h,'Consumo verificado 24h atrás. Default = média histórica (6057 MW).'); break;
+        }
+        return div;
+    }
+
+    // ── Builders de cada widget ───────────────────────────────────────
+
+    function buildSeason() {
+        return `
+        <p class="text-sm font-semibold text-gray-700 mb-3"><i class="fa-solid fa-leaf text-energy-500 mr-1"></i> Estação do Ano</p>
+        <input type="hidden" id="val-season" value="spring">
+        <div class="grid grid-cols-4 gap-2">
+            ${[['winter','❄️','Inverno'],['spring','🌸','Primavera'],['summer','☀️','Verão'],['autumn','🍂','Outono']].map(([v,e,l])=>`
+            <button type="button" onclick="setSeason('${v}',this)"
+                class="season-btn border border-gray-200 rounded-lg py-3 flex flex-col items-center gap-1 text-xs font-medium text-gray-600 bg-white hover:border-brand-500 ${v==='spring'?'active':''}">
+                <span class="text-lg">${e}</span>${l}
+            </button>`).join('')}
+        </div>`;
+    }
+
+    function setSeason(val, el) {
+        document.getElementById('val-season').value = val;
+        document.querySelectorAll('.season-btn').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    function buildMonth() {
+        const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        return `
+        <p class="text-sm font-semibold text-gray-700 mb-3"><i class="fa-solid fa-calendar text-energy-500 mr-1"></i> Mês</p>
+        <select id="val-month" class="w-full border border-gray-300 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-energy-500 bg-white text-sm">
+            ${months.map((m,i)=>`<option value="${i+1}" ${i===5?'selected':''}>${m}</option>`).join('')}
+        </select>`;
+    }
+
+    function buildDay() {
+        return `
+        <p class="text-sm font-semibold text-gray-700 mb-3"><i class="fa-solid fa-calendar-day text-energy-500 mr-1"></i> Dia do Mês</p>
+        <div class="flex items-center gap-3">
+            <input type="range" id="val-day" min="1" max="31" value="15" class="flex-1"
+                oninput="document.getElementById('disp-day').textContent=this.value">
+            <span id="disp-day" class="w-8 text-center font-bold text-gray-800 text-lg">15</span>
+        </div>`;
+    }
+
+    function buildDow() {
+        const days = [['S','Segunda',1],['T','Terça',2],['Q','Quarta',3],['Q','Quinta',4],['S','Sexta',5],['S','Sábado',6],['D','Domingo',0]];
+        return `
+        <p class="text-sm font-semibold text-gray-700 mb-3"><i class="fa-solid fa-calendar-week text-energy-500 mr-1"></i> Dia da Semana</p>
+        <input type="hidden" id="val-day_of_week" value="2">
+        <div class="grid grid-cols-7 gap-1">
+            ${days.map(([l,name,v])=>`
+            <button type="button" title="${name}" onclick="setDow(${v},this)"
+                class="dow-btn border border-gray-200 rounded-lg py-2 text-xs font-bold text-gray-600 bg-white ${v===2?'active':''}">
+                ${l}
+            </button>`).join('')}
+        </div>`;
+    }
+
+    function setDow(val, el) {
+        document.getElementById('val-day_of_week').value = val;
+        document.querySelectorAll('.dow-btn').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    function buildHour() {
+        return `
+        <p class="text-sm font-semibold text-gray-700 mb-3"><i class="fa-solid fa-clock text-energy-500 mr-1"></i> Hora do Dia</p>
+        <div class="flex items-center gap-3 mb-2">
+            <input type="range" id="val-hour" min="0" max="23" value="12" class="flex-1"
+                oninput="document.getElementById('disp-hour').textContent=this.value+'h'">
+            <span id="disp-hour" class="w-10 text-center font-bold text-gray-800 text-lg">12h</span>
+        </div>
+        <div class="flex gap-2 flex-wrap mt-1">
+            ${[['Madrugada','2'],['Manhã','8'],['Almoço','13'],['Tarde','17'],['Noite','21']].map(([l,v])=>`
+            <button type="button" class="preset-btn" onclick="setHour(${v},this)">${l}</button>`).join('')}
+        </div>`;
+    }
+
+    function setHour(val, el) {
+        document.getElementById('val-hour').value = val;
+        document.getElementById('disp-hour').textContent = val + 'h';
+        document.querySelectorAll('#val-hour').forEach(()=>{});
+        el.closest('.feature-input-card').querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active-preset'));
+        el.classList.add('active-preset');
+    }
+
+    function buildWeekend() {
+        return `
+        <p class="text-sm font-semibold text-gray-700 mb-4"><i class="fa-solid fa-umbrella-beach text-energy-500 mr-1"></i> Fim de Semana?</p>
+        <input type="hidden" id="val-is_weekend" value="0">
+        <div class="flex items-center gap-4">
+            <span id="lbl-weekend-no" class="text-sm font-medium text-gray-700">Dia útil</span>
+            <button type="button" id="toggle-weekend" onclick="toggleWeekend()"
+                class="relative inline-flex h-7 w-14 items-center rounded-full toggle-track bg-gray-200">
+                <span id="thumb-weekend" class="toggle-thumb inline-block h-5 w-5 rounded-full bg-white shadow translate-x-1"></span>
+            </button>
+            <span id="lbl-weekend-yes" class="text-sm font-medium text-gray-400">Fim de semana</span>
+        </div>`;
+    }
+
+    function toggleWeekend() {
+        const inp = document.getElementById('val-is_weekend');
+        const track = document.getElementById('toggle-weekend');
+        const thumb = document.getElementById('thumb-weekend');
+        const lblNo = document.getElementById('lbl-weekend-no');
+        const lblYes = document.getElementById('lbl-weekend-yes');
+        if (inp.value === '0') {
+            inp.value = '1';
+            track.classList.remove('bg-gray-200'); track.classList.add('bg-energy-500');
+            thumb.classList.remove('translate-x-1'); thumb.classList.add('translate-x-8');
+            lblNo.classList.remove('text-gray-700'); lblNo.classList.add('text-gray-400');
+            lblYes.classList.remove('text-gray-400'); lblYes.classList.add('text-gray-700');
+        } else {
+            inp.value = '0';
+            track.classList.add('bg-gray-200'); track.classList.remove('bg-energy-500');
+            thumb.classList.add('translate-x-1'); thumb.classList.remove('translate-x-8');
+            lblNo.classList.add('text-gray-700'); lblNo.classList.remove('text-gray-400');
+            lblYes.classList.add('text-gray-400'); lblYes.classList.remove('text-gray-700');
+        }
+    }
+
+    function buildSlider(id, label, unit, min, max, def, colorClass, icon) {
+        return `
+        <p class="text-sm font-semibold text-gray-700 mb-3"><i class="fa-solid ${icon} text-energy-500 mr-1"></i> ${label}</p>
+        <div class="flex items-center gap-3 mb-1">
+            <input type="range" id="val-${id}" min="${min}" max="${max}" step="0.1" value="${def}"
+                class="flex-1 ${colorClass}"
+                oninput="document.getElementById('disp-${id}').value=parseFloat(this.value).toFixed(1)">
+            <input type="number" id="disp-${id}" value="${def}" min="${min}" max="${max}" step="0.1"
+                class="w-20 border border-gray-300 rounded-lg px-2 py-1 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-energy-500 bg-white"
+                oninput="syncSlider('${id}',this.value)">
+            <span class="text-sm text-gray-500 w-8">${unit}</span>
+        </div>
+        <div class="flex justify-between text-xs text-gray-400 mt-1"><span>${min}${unit}</span><span>${max}${unit}</span></div>`;
+    }
+
+    function syncSlider(id, val) {
+        const slider = document.getElementById('val-' + id);
+        if (slider) slider.value = val;
+    }
+
+    function buildSolar() {
+        return `
+        <p class="text-sm font-semibold text-gray-700 mb-3"><i class="fa-solid fa-sun text-energy-500 mr-1"></i> Radiação Solar Superficial</p>
+        <div class="flex items-center gap-3 mb-2">
+            <input type="range" id="val-solar" min="0" max="986" step="1" value="200" class="flex-1"
+                oninput="document.getElementById('disp-solar').value=this.value">
+            <input type="number" id="disp-solar" value="200" min="0" max="986"
+                class="w-20 border border-gray-300 rounded-lg px-2 py-1 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-energy-500 bg-white"
+                oninput="syncSlider('solar',this.value)">
+            <span class="text-sm text-gray-500 w-10">W/m²</span>
+        </div>
+        <div class="flex gap-2 mt-2 flex-wrap">
+            ${[['🌙 Noite','0'],['☁️ Nublado','80'],['🌤️ Parcial','350'],['☀️ Sol pleno','750']].map(([l,v])=>`
+            <button type="button" class="preset-btn" onclick="setSolar(${v},this)">${l}</button>`).join('')}
+        </div>`;
+    }
+
+    function setSolar(val, el) {
+        document.getElementById('val-solar').value = val;
+        document.getElementById('disp-solar').value = val;
+        el.closest('.feature-input-card').querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active-preset'));
+        el.classList.add('active-preset');
+    }
+
+    function buildPrecip() {
+        return `
+        <p class="text-sm font-semibold text-gray-700 mb-3"><i class="fa-solid fa-droplet text-energy-500 mr-1"></i> Precipitação</p>
+        <div class="flex items-center gap-3 mb-2">
+            <input type="range" id="val-precipitation" min="0" max="2.1" step="0.01" value="0.1" class="flex-1"
+                oninput="document.getElementById('disp-prec').value=parseFloat(this.value).toFixed(2)">
+            <input type="number" id="disp-prec" value="0.10" min="0" max="2.1" step="0.01"
+                class="w-20 border border-gray-300 rounded-lg px-2 py-1 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-energy-500 bg-white"
+                oninput="syncSlider('precipitation',this.value)">
+            <span class="text-sm text-gray-500 w-6">mm</span>
+        </div>
+        <div class="flex gap-2 mt-2 flex-wrap">
+            ${[['☀️ Seco','0'],['🌦️ Chuva leve','0.3'],['🌧️ Chuva','1.0'],['⛈️ Tempestade','2.0']].map(([l,v])=>`
+            <button type="button" class="preset-btn" onclick="setPrec(${v},this)">${l}</button>`).join('')}
+        </div>`;
+    }
+
+    function setPrec(val, el) {
+        document.getElementById('val-precipitation').value = val;
+        document.getElementById('disp-prec').value = parseFloat(val).toFixed(2);
+        el.closest('.feature-input-card').querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active-preset'));
+        el.classList.add('active-preset');
+    }
+
+    function buildNumericInput(id, label, unit, defaultVal, tooltip) {
+        const isOptional = ['temp_roll3h','temp_roll24h'].includes(id);
+        return `
+        <p class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1">
+            <i class="fa-solid fa-rotate text-energy-500 mr-1"></i> ${label}
+            ${isOptional ? '<span class="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded ml-1">opcional</span>' : ''}
+            <span class="tooltip-trigger ml-1 text-gray-400 cursor-help">
+                <i class="fa-solid fa-circle-info text-xs"></i>
+                <span class="tooltip-box">${tooltip}</span>
+            </span>
+        </p>
+        <div class="flex items-center gap-2">
+            <input type="number" id="val-${id}" value="${defaultVal}" step="0.1"
+                class="flex-1 border border-gray-300 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-energy-500 bg-white text-sm font-medium"
+                placeholder="${defaultVal}">
+            <span class="text-sm text-gray-500 w-10">${unit}</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">Default: ${defaultVal} ${unit} (média histórica)</p>`;
+    }
+
+    // ── Obter valores ─────────────────────────────────────────────────
+    function getValues() {
+        const vals = { ...DEFAULTS };
+
+        if (activeFeatures.has('season'))      vals.season      = document.getElementById('val-season')?.value || DEFAULTS.season;
+        if (activeFeatures.has('month'))       vals.month       = parseInt(document.getElementById('val-month')?.value) || DEFAULTS.month;
+        if (activeFeatures.has('day'))         vals.day         = parseInt(document.getElementById('val-day')?.value) || DEFAULTS.day;
+        if (activeFeatures.has('day_of_week')) vals.day_of_week = parseInt(document.getElementById('val-day_of_week')?.value ?? DEFAULTS.day_of_week);
+        if (activeFeatures.has('hour'))        vals.hour        = parseInt(document.getElementById('val-hour')?.value) || DEFAULTS.hour;
+        if (activeFeatures.has('is_weekend'))  vals.is_weekend  = parseInt(document.getElementById('val-is_weekend')?.value ?? 0);
+        if (activeFeatures.has('temperature')) vals.temperature = parseFloat(document.getElementById('val-temperature')?.value) || DEFAULTS.temperature;
+        if (activeFeatures.has('wind'))        vals.wind        = parseFloat(document.getElementById('val-wind')?.value) || DEFAULTS.wind;
+        if (activeFeatures.has('solar'))       vals.solar       = parseFloat(document.getElementById('val-solar')?.value) || DEFAULTS.solar;
+        if (activeFeatures.has('precipitation')) vals.precipitation = parseFloat(document.getElementById('val-precipitation')?.value) || DEFAULTS.precipitation;
+        if (activeFeatures.has('temp_roll3h')) vals.temp_roll3h = parseFloat(document.getElementById('val-temp_roll3h')?.value) || DEFAULTS.temp_roll3h;
+        if (activeFeatures.has('temp_roll24h'))vals.temp_roll24h= parseFloat(document.getElementById('val-temp_roll24h')?.value) || DEFAULTS.temp_roll24h;
+        if (activeFeatures.has('lag_1h'))      vals.lag_1h      = parseFloat(document.getElementById('val-lag_1h')?.value) || DEFAULTS.lag_1h;
+        if (activeFeatures.has('lag_24h'))     vals.lag_24h     = parseFloat(document.getElementById('val-lag_24h')?.value) || DEFAULTS.lag_24h;
+
+        return vals;
+    }
+
+    // ── Gerar previsão ────────────────────────────────────────────────
+    async function generatePrediction() {
+        const vals = getValues();
+
+        // Mostrar secção de resultados
+        const section = document.getElementById('results-section');
+        section.classList.remove('hidden');
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        // Temperatura no card lateral
+        if (activeFeatures.has('temperature')) {
+            document.getElementById('temp-card').classList.remove('hidden');
+            document.getElementById('temp-display').textContent = parseFloat(vals.temperature).toFixed(1) + ' °C';
+        } else {
+            document.getElementById('temp-card').classList.add('hidden');
+        }
+
+        // Features usadas
+        const list = document.getElementById('used-features-list');
+        list.innerHTML = '';
+        activeFeatures.forEach(f => {
+            const tag = document.createElement('span');
+            tag.className = 'text-xs bg-blue-50 text-energy-500 border border-blue-100 px-2 py-0.5 rounded font-medium';
+            tag.textContent = FEATURE_LABELS[f] || f;
+            list.appendChild(tag);
+        });
+        if (activeFeatures.size === 0) {
+            list.innerHTML = '<span class="text-xs text-gray-400">Todas as defaults</span>';
+        }
+
+        // Chamar backend real
+        try {
+            const res = await fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(vals)
+            });
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('res-point').textContent    = (data.prediction ?? '—') + ' MW';
+                document.getElementById('res-interval').textContent = data.interval ? `${data.interval[0]}–${data.interval[1]} MW` : '—';
+                document.getElementById('res-confidence').textContent = data.confidence ? data.confidence + '%' : '—';
+                renderChart(data.chart_labels || [], data.chart_values || [], data.prediction, vals.hour);
+            } else {
+                showMockResults(vals);
+            }
+        } catch(e) {
+            showMockResults(vals);
+        }
+    }
+
+    function showMockResults(vals) {
+        // Mock enquanto o backend não está ligado
+        const base = 5500 + (vals.temperature - 16) * 80 + (vals.hour < 6 || vals.hour > 22 ? -800 : 0) + (vals.is_weekend ? -400 : 0);
+        const pred = Math.round(Math.max(1000, Math.min(9000, base + (Math.random()-0.5)*200)));
+        document.getElementById('res-point').textContent    = pred.toLocaleString('pt-PT') + ' MW';
+        document.getElementById('res-interval').textContent = `${(pred-250).toLocaleString('pt-PT')}–${(pred+250).toLocaleString('pt-PT')} MW`;
+        document.getElementById('res-confidence').textContent = '90%';
+
+        const labels = Array.from({length:24},(_,i)=>i+'h');
+        const values = labels.map((_,i) => {
+            const h = i;
+            const base2 = 5000 + (vals.temperature - 16)*80 + (h<6||h>22?-800:0) + (h>=8&&h<=20?600:0) + (vals.is_weekend?-400:0);
+            return Math.round(base2 + (Math.random()-0.5)*300);
+        });
+        renderChart(labels, values, pred, vals.hour);
+    }
+
+    function renderChart(labels, values, prediction, selectedHour) {
+        const ctx = document.getElementById('predictionChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Carga Prevista (MW)',
+                        data: values,
+                        borderColor: '#3b82f6',
+                        backgroundColor: '#3b82f620',
+                        borderWidth: 2,
+                        pointRadius: 2,
+                        fill: true,
+                        tension: 0.3
+                    },
+                    ...(prediction == null ? [] : [{
+                        label: activeFeatures.has('hour')
+                            ? `Hora selecionada (${String(selectedHour ?? 0).padStart(2,'0')}h)`
+                            : `Hora por defeito (12h)`,
+                        data: labels.map((_,i) => i === (selectedHour ?? 0) ? prediction : null),
+                        borderColor: '#10b981',
+                        backgroundColor: '#10b981',
+                        borderWidth: 0,
+                        pointRadius: labels.map((_,i) => i === (selectedHour ?? 0) ? 9 : 0),
+                        pointBackgroundColor: '#10b981',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        type: 'line',
+                        fill: false,
+                        tension: 0
+                    }])
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: { font: { size: 11 }, boxWidth: 14, padding: 16 }
+                    },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    x: { ticks: { maxTicksLimit: 12, font: { size: 11 } } },
+                    y: {
+                        ticks: { font: { size: 11 } },
+                        title: { display: true, text: 'MW', font: { size: 11 }, color: '#9ca3af' }
+                    }
+                }
+            }
+        });
+    }
+
+    // ── Init: carregar gráfico com dados reais do dia ─────────────────
+    document.addEventListener('DOMContentLoaded', async () => {
+        // O gráfico principal (resultados) só aparece após a previsão.
+        // Não há gráfico inicial isolado nesta versão — tudo no fluxo do cenário.
+    });
+    </script>
+</body>
+</html>

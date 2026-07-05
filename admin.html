@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Admin — Energy Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand:  { 50:'#f0fdf4', 100:'#dcfce7', 500:'#10b981', 600:'#059669', 700:'#047857', 900:'#064e3b' },
+                        energy: { 50:'#eff6ff', 500:'#3b82f6', 600:'#2563eb' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* ── Overlay modal ── */
+        .modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.55);
+            backdrop-filter: blur(4px);
+            z-index: 60;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .modal-overlay.open { display: flex; }
+
+        /* ── Terminal log ── */
+        .terminal {
+            background: #0f172a;
+            color: #94a3b8;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            border-radius: 10px;
+            padding: 1rem 1.2rem;
+            min-height: 120px;
+            max-height: 300px;
+            overflow-y: auto;
+            line-height: 1.7;
+        }
+        .terminal .log-ok    { color: #34d399; }
+        .terminal .log-warn  { color: #fbbf24; }
+        .terminal .log-error { color: #f87171; }
+        .terminal .log-info  { color: #93c5fd; }
+        .terminal .log-dim   { color: #475569; }
+
+        /* ── Card hover ── */
+        .action-card {
+            transition: all .18s ease;
+            cursor: pointer;
+        }
+        .action-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.09);
+        }
+        .action-card:active { transform: translateY(-1px); }
+
+        /* ── Spinner ── */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner {
+            display: inline-block;
+            width: 14px; height: 14px;
+            border: 2px solid rgba(255,255,255,.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+
+        /* ── Date picker ── */
+        input[type=date], input[type=text], input[type=number], select, textarea {
+            outline: none;
+        }
+        input[type=date]:focus, input[type=text]:focus, input[type=number]:focus,
+        select:focus, textarea:focus {
+            ring: 2px solid #10b981;
+        }
+
+        /* ── Scrollbar terminal ── */
+        .terminal::-webkit-scrollbar { width: 5px; }
+        .terminal::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+        /* ── Badge pulse ── */
+        @keyframes pulse2 { 0%,100%{opacity:1} 50%{opacity:.4} }
+        .pulse-dot { animation: pulse2 1.8s ease-in-out infinite; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+
+<!-- ══════════════════════════════════════════════════════
+     HEADER
+═══════════════════════════════════════════════════════ -->
+<header class="bg-white shadow-sm sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16 items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-brand-500 text-white p-2 rounded-lg">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-xl text-gray-900 leading-tight">Energy Analytics</h1>
+                    <p class="text-xs text-gray-500">PIACD 2025/2026 • UC DEI</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-xs font-bold bg-amber-100 text-amber-700 px-3 py-1 rounded-full border border-amber-200">
+                    <i class="fa-solid fa-shield-halved mr-1"></i>Admin
+                </span>
+                <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                    <i class="fa-solid fa-user mr-1"></i>{{ session.user }}
+                </span>
+                <a href="/logout"
+                   class="text-gray-600 hover:text-red-600 font-medium transition-colors text-sm">
+                    <i class="fa-solid fa-right-from-bracket mr-1"></i>Sair
+                </a>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════
+     HERO
+═══════════════════════════════════════════════════════ -->
+<section class="bg-brand-900 text-white py-14">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h2 class="text-3xl md:text-4xl font-extrabold mb-3">Painel de Administração</h2>
+        <p class="text-brand-50 max-w-2xl mx-auto text-base mb-6">
+            Controlo total sobre dados, pipeline, modelos e utilizadores do sistema de análise climático-energética.
+        </p>
+        <div class="flex justify-center gap-3 flex-wrap">
+            <span class="bg-white/15 border border-white/25 px-4 py-1.5 rounded-full text-sm font-medium">🇵🇹 Dataset: Portugal</span>
+            <span class="bg-white/15 border border-white/25 px-4 py-1.5 rounded-full text-sm font-medium">👥 Grupo PL1G3</span>
+            {% if stats %}
+            <span class="bg-white/15 border border-white/25 px-4 py-1.5 rounded-full text-sm font-medium">
+                📅 {{ stats.min_date }} → {{ stats.max_date }}
+            </span>
+            <span class="bg-white/15 border border-white/25 px-4 py-1.5 rounded-full text-sm font-medium">
+                📊 {{ stats.n_rows }} registos
+            </span>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     MAIN
+═══════════════════════════════════════════════════════ -->
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+    <!-- ── GRID DE AÇÕES (10 opções) ── -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 mb-10">
+
+        <!-- 1. Explorar Dados -->
+        <div class="action-card bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+             onclick="openModal('modal-explore')">
+            <div class="h-12 w-12 bg-blue-50 text-energy-500 rounded-lg flex items-center justify-center text-xl mb-4">
+                <i class="fa-solid fa-chart-line"></i>
+            </div>
+            <div class="flex items-start justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-gray-900 mb-1">Explorar Dados</h3>
+                    <p class="text-gray-500 text-sm">Energia e clima lado a lado para um dia específico.</p>
+                </div>
+                <span class="text-xs bg-blue-50 text-energy-500 font-bold px-2 py-0.5 rounded ml-2 shrink-0">1</span>
+            </div>
+        </div>
+
+        <!-- 2. Explorar Features -->
+        <div class="action-card bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+             onclick="openModal('modal-features')">
+            <div class="h-12 w-12 bg-purple-50 text-purple-500 rounded-lg flex items-center justify-center text-xl mb-4">
+                <i class="fa-solid fa-table-cells"></i>
+            </div>
+            <div class="flex items-start justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-gray-900 mb-1">Explorar Features</h3>
+                    <p class="text-gray-500 text-sm">Analise as features calculadas para um período.</p>
+                </div>
+                <span class="text-xs bg-purple-50 text-purple-600 font-bold px-2 py-0.5 rounded ml-2 shrink-0">2</span>
+            </div>
+        </div>
+
+        <!-- 3. Ingestão de Dados -->
+        <div class="action-card bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+             onclick="openModal('modal-ingestion')">
+            <div class="h-12 w-12 bg-orange-50 text-orange-500 rounded-lg flex items-center justify-center text-xl mb-4">
+                <i class="fa-solid fa-cloud-arrow-down"></i>
+            </div>
+            <div class="flex items-start justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-gray-900 mb-1">Ingestão de Dados</h3>
+                    <p class="text-gray-500 text-sm">Recolhe dados ENTSO-E e ERA5 via pipeline.</p>
+                </div>
+                <span class="text-xs bg-orange-50 text-orange-600 font-bold px-2 py-0.5 rounded ml-2 shrink-0">3</span>
+            </div>
+        </div>
+
+        <!-- 4. Cleaning e Alinhamento -->
+        <div class="action-card bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+             onclick="openModal('modal-cleaning')">
+            <div class="h-12 w-12 bg-teal-50 text-teal-500 rounded-lg flex items-center justify-center text-xl mb-4">
+                <i class="fa-solid fa-broom"></i>
+            </div>
+            <div class="flex items-start justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-gray-900 mb-1">Cleaning & Alinhamento</h3>
+                    <p class="text-gray-500 text-sm">Limpeza e fusão dos datasets processados.</p>
+                </div>
+                <span class="text-xs bg-teal-50 text-teal-600 font-bold px-2 py-0.5 rounded ml-2 shrink-0">4</span>
+            </div>
+        </div>
+
+        <!-- 5. Feature Engineering -->
+        <div class="action-card bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+             onclick="openModal('modal-feat-eng')">
+            <div class="h-12 w-12 bg-indigo-50 text-indigo-500 rounded-lg flex items-center justify-center text-xl mb-4">
+                <i class="fa-solid fa-microchip"></i>
+            </div>
+            <div class="flex items-start justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-gray-900 mb-1">Feature Engineering</h3>
+                    <p class="text-gray-500 text-sm">Gera features base (v1) e avançadas (v2).</p>
+                </div>
+                <span class="text-xs bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded ml-2 shrink-0">5</span>
+            </div>
+        </div>
+
+        <!-- 6. Treinar Modelos -->
+        <div class="action-card bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+             onclick="openModal('modal-training')">
+            <div class="h-12 w-12 bg-rose-50 text-rose-500 rounded-lg flex items-center justify-center text-xl mb-4">
+                <i class="fa-solid fa-gears"></i>
+            </div>
+            <div class="flex items-start justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-gray-900 mb-1">Treinar Modelos</h3>
+                    <p class="text-gray-500 text-sm">Linear Regression e Random Forest sobre features.</p>
+                </div>
+                <span class="text-xs bg-rose-50 text-rose-600 font-bold px-2 py-0.5 rounded ml-2 shrink-0">6</span>
+            </div>
+        </div>
+
+        <!-- 7. Métricas / Resultados -->
+        <div class="action-card bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+             onclick="openModal('modal-metrics')">
+            <div class="h-12 w-12 bg-emerald-50 text-emerald-500 rounded-lg flex items-center justify-center text-xl mb-4">
+                <i class="fa-solid fa-chart-bar"></i>
+            </div>
+            <div class="flex items-start justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-gray-900 mb-1">Ver Métricas</h3>
+                    <p class="text-gray-500 text-sm">MAE, RMSE, R² e avisos de overfitting.</p>
+                </div>
+                <span class="text-xs bg-emerald-50 text-emerald-600 font-bold px-2 py-0.5 rounded ml-2 shrink-0">7</span>
+            </div>
+        </div>
+
+        <!-- 8. Gerar Previsão -->
+        <div class="action-card bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+             onclick="window.location.href='/forecast'">
+            <div class="h-12 w-12 bg-cyan-50 text-cyan-500 rounded-lg flex items-center justify-center text-xl mb-4">
+                <i class="fa-solid fa-brain"></i>
+            </div>
+            <div class="flex items-start justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-gray-900 mb-1">Gerar Previsão</h3>
+                    <p class="text-gray-500 text-sm">Corre um modelo treinado sobre as últimas N horas.</p>
+                </div>
+                <span class="text-xs bg-cyan-50 text-cyan-600 font-bold px-2 py-0.5 rounded ml-2 shrink-0">8</span>
+            </div>
+        </div>
+
+        <!-- 9. Promover Utilizador -->
+        <div class="action-card bg-white rounded-xl shadow-sm border border-amber-100 p-6 border"
+             onclick="openModal('modal-promote')">
+            <div class="h-12 w-12 bg-amber-50 text-amber-500 rounded-lg flex items-center justify-center text-xl mb-4">
+                <i class="fa-solid fa-user-shield"></i>
+            </div>
+            <div class="flex items-start justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-gray-900 mb-1">Promover a Admin</h3>
+                    <p class="text-gray-500 text-sm">Eleva um utilizador a administrador do sistema.</p>
+                </div>
+                <span class="text-xs bg-amber-50 text-amber-600 font-bold px-2 py-0.5 rounded ml-2 shrink-0">9</span>
+            </div>
+        </div>
+
+        <!-- 10. Logout -->
+        <a href="/logout"
+           class="action-card bg-white rounded-xl shadow-sm border border-gray-100 p-6 block no-underline">
+            <div class="h-12 w-12 bg-red-50 text-red-400 rounded-lg flex items-center justify-center text-xl mb-4">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </div>
+            <div class="flex items-start justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-gray-900 mb-1">Logout</h3>
+                    <p class="text-gray-500 text-sm">Termina a sessão e regressa à página inicial.</p>
+                </div>
+                <span class="text-xs bg-red-50 text-red-400 font-bold px-2 py-0.5 rounded ml-2 shrink-0">10</span>
+            </div>
+        </a>
+
+    </div>
+
+    <!-- ── VISÃO GERAL DE DADOS (gráficos do dia) ── -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <h3 class="text-lg font-bold text-gray-900">
+                <i class="fa-solid fa-chart-area text-energy-500 mr-2"></i>
+                Visão Geral — Procura vs Temperatura
+            </h3>
+            <div class="flex items-center gap-2">
+                <input type="date" id="date-picker"
+                    class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                    {% if stats %} min="{{ stats.min_date }}" max="{{ stats.max_date }}" value="{{ stats.min_date }}" {% endif %}>
+                <button onclick="loadCharts()"
+                    class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    <i class="fa-solid fa-rotate mr-1"></i>Carregar
+                </button>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Carga Eléctrica (MW)</p>
+                <div style="height:240px"><canvas id="chartEnergy"></canvas></div>
+            </div>
+            <div>
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Temperatura 2m (°C)</p>
+                <div style="height:240px"><canvas id="chartWeather"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<!-- ══════════════════════════════════════════════════════
+     MODAIS
+═══════════════════════════════════════════════════════ -->
+
+<!-- ── 1. Explorar Dados ── -->
+<div id="modal-explore" class="modal-overlay" onclick="outsideClose(event,'modal-explore')">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+        <div class="bg-blue-600 text-white px-6 py-4 flex justify-between items-center">
+            <h3 class="font-bold text-lg"><i class="fa-solid fa-chart-line mr-2"></i>Explorar Dados de um Dia</h3>
+            <button onclick="closeModal('modal-explore')" class="hover:opacity-70"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="p-6 space-y-4 overflow-y-auto flex-1">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                    <input type="date" id="explore-date"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                        {% if stats %} min="{{ stats.min_date }}" max="{{ stats.max_date }}" value="{{ stats.min_date }}" {% endif %}>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Hora</label>
+                    <select id="explore-hour" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="all">Todo o dia</option>
+                        {% for h in range(24) %}
+                        <option value="{{ h }}">{{ "%02d"|format(h) }}:00</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="exploreAction('energy')"
+                    class="flex-1 bg-energy-500 hover:bg-energy-600 text-white font-medium py-2 rounded-lg text-sm transition-colors">
+                    <i class="fa-solid fa-bolt mr-1"></i>Ver Energia
+                </button>
+                <button onclick="exploreAction('weather')"
+                    class="flex-1 bg-teal-500 hover:bg-teal-600 text-white font-medium py-2 rounded-lg text-sm transition-colors">
+                    <i class="fa-solid fa-cloud-sun mr-1"></i>Ver Clima
+                </button>
+                <button onclick="exploreAction('both')"
+                    class="flex-1 bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 rounded-lg text-sm transition-colors">
+                    <i class="fa-solid fa-layer-group mr-1"></i>Ver Ambos
+                </button>
+            </div>
+            <!-- Terminal output -->
+            <div id="explore-terminal" class="terminal hidden"></div>
+            <!-- Charts -->
+            <div id="explore-charts" class="hidden space-y-4">
+                <div id="explore-energy-section" class="hidden">
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Carga Eléctrica (MW)</p>
+                    <div style="height:180px"><canvas id="explore-chartEnergy"></canvas></div>
+                </div>
+                <div id="explore-weather-section" class="hidden">
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Temperatura (°C)</p>
+                    <div style="height:180px"><canvas id="explore-chartWeather"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── 2. Explorar Features ── -->
+<div id="modal-features" class="modal-overlay" onclick="outsideClose(event,'modal-features')">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+        <div class="bg-purple-600 text-white px-6 py-4 flex justify-between items-center">
+            <h3 class="font-bold text-lg"><i class="fa-solid fa-table-cells mr-2"></i>Explorar Features Calculadas</h3>
+            <button onclick="closeModal('modal-features')" class="hover:opacity-70"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="p-6 space-y-4 overflow-y-auto flex-1">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                    <input type="date" id="feat-date"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                        {% if stats %} min="{{ stats.min_date }}" max="{{ stats.max_date }}" value="{{ stats.min_date }}" {% endif %}>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Hora</label>
+                    <select id="feat-hour" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="all">Todo o dia</option>
+                        {% for h in range(24) %}
+                        <option value="{{ h }}">{{ "%02d"|format(h) }}:00</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <button onclick="runFeatureExplore()"
+                class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors">
+                <i class="fa-solid fa-magnifying-glass mr-1"></i>Carregar Features
+            </button>
+            <div id="feat-terminal" class="terminal hidden"></div>
+            <div id="feat-table-wrap" class="hidden overflow-x-auto rounded-lg border border-gray-200"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ── 3. Ingestão de Dados ── -->
+<div id="modal-ingestion" class="modal-overlay" onclick="outsideClose(event,'modal-ingestion')">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+        <div class="bg-orange-500 text-white px-6 py-4 flex justify-between items-center">
+            <h3 class="font-bold text-lg"><i class="fa-solid fa-cloud-arrow-down mr-2"></i>Ingestão de Dados</h3>
+            <button onclick="closeModal('modal-ingestion')" class="hover:opacity-70"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="p-6 space-y-4 overflow-y-auto flex-1">
+            <div class="bg-orange-50 border border-orange-200 rounded-lg p-4 text-sm text-orange-800">
+                <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+                Esta operação irá correr a ingestão completa — ENTSO-E (carga eléctrica) e ERA5 (meteorologia). Pode demorar vários minutos.
+            </div>
+            <div class="space-y-2 text-sm text-gray-600">
+                <div class="flex items-center gap-2"><i class="fa-solid fa-circle-dot text-orange-400"></i> Correr <code class="bg-gray-100 px-1 rounded">run_ingestion_raw()</code> — ENTSO-E</div>
+                <div class="flex items-center gap-2"><i class="fa-solid fa-circle-dot text-orange-400"></i> Correr <code class="bg-gray-100 px-1 rounded">download_era5()</code> → <code class="bg-gray-100 px-1 rounded">ingest_era5()</code></div>
+            </div>
+            <button onclick="runPipeline('ingestion')"
+                class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-lg text-sm transition-colors">
+                <i class="fa-solid fa-play mr-1"></i>Iniciar Ingestão
+            </button>
+            <div id="ingestion-terminal" class="terminal hidden"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ── 4. Cleaning e Alinhamento ── -->
+<div id="modal-cleaning" class="modal-overlay" onclick="outsideClose(event,'modal-cleaning')">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+        <div class="bg-teal-600 text-white px-6 py-4 flex justify-between items-center">
+            <h3 class="font-bold text-lg"><i class="fa-solid fa-broom mr-2"></i>Cleaning e Alinhamento</h3>
+            <button onclick="closeModal('modal-cleaning')" class="hover:opacity-70"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="p-6 space-y-4 overflow-y-auto flex-1">
+            <div class="bg-teal-50 border border-teal-200 rounded-lg p-4 text-sm text-teal-800">
+                <i class="fa-solid fa-info-circle mr-1"></i>
+                Corre o cleaning de energia e une os datasets num único ficheiro <code>merged.csv</code>.
+            </div>
+            <div class="space-y-2 text-sm text-gray-600">
+                <div class="flex items-center gap-2"><i class="fa-solid fa-circle-dot text-teal-400"></i> Correr <code class="bg-gray-100 px-1 rounded">run_processing()</code></div>
+                <div class="flex items-center gap-2"><i class="fa-solid fa-circle-dot text-teal-400"></i> Correr <code class="bg-gray-100 px-1 rounded">merge_datasets(...)</code> → <code class="bg-gray-100 px-1 rounded">merged.csv</code></div>
+            </div>
+            <button onclick="runPipeline('cleaning')"
+                class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 rounded-lg text-sm transition-colors">
+                <i class="fa-solid fa-play mr-1"></i>Iniciar Cleaning
+            </button>
+            <div id="cleaning-terminal" class="terminal hidden"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ── 5. Feature Engineering ── -->
+<div id="modal-feat-eng" class="modal-overlay" onclick="outsideClose(event,'modal-feat-eng')">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+        <div class="bg-indigo-600 text-white px-6 py-4 flex justify-between items-center">
+            <h3 class="font-bold text-lg"><i class="fa-solid fa-microchip mr-2"></i>Feature Engineering</h3>
+            <button onclick="closeModal('modal-feat-eng')" class="hover:opacity-70"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="p-6 space-y-4 overflow-y-auto flex-1">
+            <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-sm text-indigo-800">
+                <i class="fa-solid fa-info-circle mr-1"></i>
+                Gera as features base (v1) a partir do <code>merged.csv</code> e depois as features avançadas (v2).
+            </div>
+            <div class="space-y-2 text-sm text-gray-600">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-circle-dot text-indigo-400"></i>
+                    <code class="bg-gray-100 px-1 rounded">generate_features()</code> → <code class="bg-gray-100 px-1 rounded">features_v1.csv</code>
+                </div>
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-circle-dot text-indigo-400"></i>
+                    <code class="bg-gray-100 px-1 rounded">generate_advanced_features()</code> → <code class="bg-gray-100 px-1 rounded">features_v2_advanced.csv</code>
+                </div>
+            </div>
+            <button onclick="runPipeline('features')"
+                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-sm transition-colors">
+                <i class="fa-solid fa-play mr-1"></i>Correr Feature Engineering
+            </button>
+            <div id="feateng-terminal" class="terminal hidden"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ── 6. Treinar Modelos ── -->
+<div id="modal-training" class="modal-overlay" onclick="outsideClose(event,'modal-training')">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+        <div class="bg-rose-600 text-white px-6 py-4 flex justify-between items-center">
+            <h3 class="font-bold text-lg"><i class="fa-solid fa-gears mr-2"></i>Treinar Modelos</h3>
+            <button onclick="closeModal('modal-training')" class="hover:opacity-70"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="p-6 space-y-4 overflow-y-auto flex-1">
+            <div class="bg-rose-50 border border-rose-200 rounded-lg p-4 text-sm text-rose-800">
+                <i class="fa-solid fa-lock mr-1"></i>
+                Requer confirmação de credenciais. Treina Linear Regression e Random Forest usando <code>features_v2_advanced.csv</code>.
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Confirmar Password</label>
+                <input type="password" id="train-password" placeholder="••••••••"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-400">
+            </div>
+            <button onclick="runTraining()"
+                class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-lg text-sm transition-colors">
+                <i class="fa-solid fa-play mr-1"></i>Iniciar Treino
+            </button>
+            <div id="training-terminal" class="terminal hidden"></div>
+            <div id="training-results" class="hidden"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ── 7. Ver Métricas ── -->
+<div id="modal-metrics" class="modal-overlay" onclick="outsideClose(event,'modal-metrics')">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+        <div class="bg-emerald-600 text-white px-6 py-4 flex justify-between items-center">
+            <h3 class="font-bold text-lg"><i class="fa-solid fa-chart-bar mr-2"></i>Métricas e Resultados</h3>
+            <button onclick="closeModal('modal-metrics')" class="hover:opacity-70"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="p-6 space-y-4 overflow-y-auto flex-1">
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-sm text-emerald-800">
+                <i class="fa-solid fa-lock mr-1"></i>
+                Requer confirmação de credenciais para aceder às métricas dos modelos treinados.
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Confirmar Password</label>
+                <input type="password" id="metrics-password" placeholder="••••••••"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-400">
+            </div>
+            <button onclick="runMetrics()"
+                class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg text-sm transition-colors">
+                <i class="fa-solid fa-magnifying-glass-chart mr-1"></i>Ver Métricas
+            </button>
+            <div id="metrics-terminal" class="terminal hidden"></div>
+            <div id="metrics-results" class="hidden space-y-3"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ── 8. Gerar Previsão ── -->
+<div id="modal-prediction" class="modal-overlay" onclick="outsideClose(event,'modal-prediction')">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+        <div class="bg-cyan-600 text-white px-6 py-4 flex justify-between items-center">
+            <h3 class="font-bold text-lg"><i class="fa-solid fa-brain mr-2"></i>Gerar Previsão</h3>
+            <button onclick="closeModal('modal-prediction')" class="hover:opacity-70"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="p-6 space-y-4 overflow-y-auto flex-1">
+            <div class="bg-cyan-50 border border-cyan-200 rounded-lg p-4 text-sm text-cyan-800">
+                <i class="fa-solid fa-lock mr-1"></i>
+                Requer confirmação de credenciais. Usa o último modelo treinado para prever carga nas próximas horas.
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Confirmar Password</label>
+                <input type="password" id="pred-password" placeholder="••••••••"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-400">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nº de horas a usar (histórico)</label>
+                <input type="number" id="pred-nhours" value="24" min="1" max="168"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            </div>
+            <button onclick="runPrediction()"
+                class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2.5 rounded-lg text-sm transition-colors">
+                <i class="fa-solid fa-play mr-1"></i>Gerar Previsão
+            </button>
+            <div id="pred-terminal" class="terminal hidden"></div>
+            <div id="pred-results" class="hidden">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Primeiras previsões</p>
+                <div id="pred-table" class="overflow-x-auto rounded-lg border border-gray-100"></div>
+                <p id="pred-timing" class="text-xs text-gray-400 mt-2 text-right"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── 9. Promover Utilizador ── -->
+<div id="modal-promote" class="modal-overlay" onclick="outsideClose(event,'modal-promote')">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+        <div class="bg-amber-500 text-white px-6 py-4 flex justify-between items-center">
+            <h3 class="font-bold text-lg"><i class="fa-solid fa-user-shield mr-2"></i>Promover Utilizador a Admin</h3>
+            <button onclick="closeModal('modal-promote')" class="hover:opacity-70"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="p-6 space-y-4 overflow-y-auto flex-1">
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+                <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+                Esta ação é irreversível. O utilizador ficará com acesso total ao sistema.
+            </div>
+            <form method="POST" action="/admin/promote" class="space-y-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Username do utilizador</label>
+                    <input type="text" name="target_user" required placeholder="ex: joao.silva"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400">
+                </div>
+                <button type="submit"
+                    class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 rounded-lg text-sm transition-colors">
+                    <i class="fa-solid fa-arrow-up mr-1"></i>Promover
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     SCRIPTS
+═══════════════════════════════════════════════════════ -->
+<script>
+/* ── Modal helpers ── */
+function openModal(id) {
+    document.getElementById(id).classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+    document.body.style.overflow = '';
+}
+function outsideClose(e, id) {
+    if (e.target === document.getElementById(id)) closeModal(id);
+}
+
+/* ── Terminal helpers ── */
+function termLog(el, msg, type='') {
+    el.classList.remove('hidden');
+    const classes = { ok:'log-ok', warn:'log-warn', error:'log-error', info:'log-info', dim:'log-dim' };
+    const span = document.createElement('div');
+    span.className = classes[type] || '';
+    span.textContent = msg;
+    el.appendChild(span);
+    el.scrollTop = el.scrollHeight;
+}
+function termClear(el) {
+    el.innerHTML = '';
+    el.classList.remove('hidden');
+}
+
+/* ── Chart builder ── */
+let chartEnergy = null, chartWeather = null;
+function buildChart(canvasId, labels, data, label, color) {
+    const ctx = document.getElementById(canvasId)?.getContext('2d');
+    if (!ctx) return null;
+    return new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label,
+                data,
+                borderColor: color,
+                backgroundColor: color + '22',
+                borderWidth: 2,
+                pointRadius: 2,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { maxTicksLimit: 8, font: { size: 11 } } },
+                y: { ticks: { font: { size: 11 } } }
+            }
+        }
+    });
+}
+
+/* ─────────────────────────────────────────────────────
+   VISÃO GERAL (gráficos do painel principal)
+───────────────────────────────────────────────────── */
+async function loadCharts() {
+    const date = document.getElementById('date-picker').value;
+    if (!date) return;
+    const [eRes, wRes] = await Promise.all([
+        fetch(`/api/energy?date=${date}`),
+        fetch(`/api/weather?date=${date}`)
+    ]);
+    const eData = await eRes.json();
+    const wData = await wRes.json();
+    if (chartEnergy)  chartEnergy.destroy();
+    if (chartWeather) chartWeather.destroy();
+    if (eData.labels) chartEnergy  = buildChart('chartEnergy',  eData.labels, eData.values, 'Carga (MW)', '#3b82f6');
+    if (wData.labels) chartWeather = buildChart('chartWeather', wData.labels, wData.temps,  'Temp (°C)',  '#10b981');
+}
+document.addEventListener('DOMContentLoaded', loadCharts);
+
+/* ─────────────────────────────────────────────────────
+   1. EXPLORAR DADOS
+───────────────────────────────────────────────────── */
+let exploreEChart = null, exploreWChart = null;
+
+async function exploreAction(mode) {
+    const date  = document.getElementById('explore-date').value;
+    const hour  = document.getElementById('explore-hour').value;
+    const term  = document.getElementById('explore-terminal');
+    const charts = document.getElementById('explore-charts');
+    const wSec   = document.getElementById('explore-weather-section');
+
+    const eSec = document.getElementById('explore-energy-section');
+
+    termClear(term);
+    charts.classList.add('hidden');
+    eSec.classList.add('hidden');
+    wSec.classList.add('hidden');
+
+    if (!date) { termLog(term, '  [ERRO] Selecciona uma data.', 'error'); return; }
+
+    const hourParam = hour !== 'all' ? `&hour=${hour}` : '';
+    termLog(term, `  [INFO] A carregar dados para ${date} ${hour !== 'all' ? hour+'h' : '(dia completo)'}...`, 'info');
+
+    try {
+        const showEnergy  = mode === 'energy'  || mode === 'both';
+        const showWeather = mode === 'weather' || mode === 'both';
+
+        if (showEnergy) {
+            const r = await fetch(`/api/energy?date=${date}${hourParam}`);
+            const d = await r.json();
+            if (d.error) { termLog(term, `  [ERRO] ${d.error}`, 'error'); }
+            else {
+                termLog(term, `  [OK]   Energia: ${d.labels?.length || 0} registos`, 'ok');
+                charts.classList.remove('hidden');
+                eSec.classList.remove('hidden');
+                if (exploreEChart) exploreEChart.destroy();
+                exploreEChart = buildChart('explore-chartEnergy', d.labels, d.values, 'Carga (MW)', '#3b82f6');
+                const vals = d.values || [];
+                if (vals.length) {
+                    const avg = (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1);
+                    const mx  = Math.max(...vals).toFixed(1);
+                    const mn  = Math.min(...vals).toFixed(1);
+                    termLog(term, `           Média: ${avg} MW  |  Máx: ${mx} MW  |  Mín: ${mn} MW`, 'dim');
+                }
+            }
+        }
+
+        if (showWeather) {
+            const r = await fetch(`/api/weather?date=${date}${hourParam}`);
+            const d = await r.json();
+            if (d.error) { termLog(term, `  [ERRO] ${d.error}`, 'error'); }
+            else {
+                termLog(term, `  [OK]   Clima: ${d.labels?.length || 0} registos`, 'ok');
+                charts.classList.remove('hidden');
+                wSec.classList.remove('hidden');
+                if (exploreWChart) exploreWChart.destroy();
+                exploreWChart = buildChart('explore-chartWeather', d.labels, d.temps, 'Temp (°C)', '#10b981');
+                const temps = d.temps || [];
+                if (temps.length) {
+                    const avg = (temps.reduce((a,b)=>a+b,0)/temps.length).toFixed(1);
+                    const mx  = Math.max(...temps).toFixed(1);
+                    const mn  = Math.min(...temps).toFixed(1);
+                    termLog(term, `           Média: ${avg} °C  |  Máx: ${mx} °C  |  Mín: ${mn} °C`, 'dim');
+                }
+            }
+        }
+    } catch(e) {
+        termLog(term, `  [ERRO] ${e.message}`, 'error');
+    }
+}
+
+/* ─────────────────────────────────────────────────────
+   2. EXPLORAR FEATURES
+───────────────────────────────────────────────────── */
+async function runFeatureExplore() {
+    const date = document.getElementById('feat-date').value;
+    const hour = document.getElementById('feat-hour').value;
+    const term = document.getElementById('feat-terminal');
+    const wrap = document.getElementById('feat-table-wrap');
+
+    termClear(term);
+    wrap.classList.add('hidden');
+    wrap.innerHTML = '';
+
+    if (!date) { termLog(term, '  [ERRO] Selecciona uma data.', 'error'); return; }
+
+    const hourParam = hour !== 'all' ? `&hour=${hour}` : '';
+    termLog(term, `  [INFO] A carregar features para ${date}...`, 'info');
+
+    try {
+        const r = await fetch(`/api/features?date=${date}${hourParam}`);
+        const d = await r.json();
+        if (d.error) {
+            termLog(term, `  [ERRO] ${d.error}`, 'error');
+            return;
+        }
+        const rows = d.rows || [];
+        const cols = d.columns || [];
+        termLog(term, `  [OK]   ${rows.length} linha(s), ${cols.length} feature(s)`, 'ok');
+
+        if (!rows.length) { termLog(term, '  [WARN] Sem dados para este período.', 'warn'); return; }
+
+        // Build HTML table
+        let html = `<table class="w-full text-xs border-collapse">
+            <thead><tr class="bg-gray-50">
+                <th class="px-3 py-2 text-left font-semibold text-gray-500 border-b border-gray-200">Timestamp</th>`;
+        cols.forEach(c => {
+            html += `<th class="px-3 py-2 text-right font-semibold text-gray-500 border-b border-gray-200 whitespace-nowrap">${c}</th>`;
+        });
+        html += '</tr></thead><tbody>';
+        rows.forEach((row, i) => {
+            const bg = i % 2 === 0 ? '' : 'bg-gray-50/60';
+            html += `<tr class="${bg}"><td class="px-3 py-1.5 text-gray-500 border-b border-gray-100 whitespace-nowrap font-mono">${row.timestamp}</td>`;
+            cols.forEach(c => {
+                const v = row[c];
+                const disp = typeof v === 'number' ? v.toFixed(3) : (v ?? '—');
+                html += `<td class="px-3 py-1.5 text-right text-gray-700 border-b border-gray-100 font-mono">${disp}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+
+        wrap.innerHTML = html;
+        wrap.classList.remove('hidden');
+    } catch(e) {
+        termLog(term, `  [ERRO] ${e.message}`, 'error');
+    }
+}
+
+/* ─────────────────────────────────────────────────────
+   6. TREINAR MODELOS
+───────────────────────────────────────────────────── */
+async function runTraining() {
+    const password = document.getElementById('train-password').value;
+    const term     = document.getElementById('training-terminal');
+    const results  = document.getElementById('training-results');
+
+    termClear(term);
+    results.classList.add('hidden');
+    results.innerHTML = '';
+
+    if (!password) { termLog(term, '  [ERRO] Confirma a tua password.', 'error'); return; }
+
+    termLog(term, '  [INFO] A verificar credenciais...', 'info');
+    termLog(term, '  [INFO] A carregar dataset de features...', 'info');
+    termLog(term, '  [INFO] A treinar modelos (linear + random forest)...', 'info');
+
+    try {
+        const r = await fetch('/api/train', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        const d = await r.json();
+
+        if (d.error) { termLog(term, `  [ERRO] ${d.error}`, 'error'); return; }
+
+        termLog(term, `  [OK]   Treino concluído em ${d.elapsed?.toFixed(2) || '?'} segundos.`, 'ok');
+
+        const res = d.results || {};
+        let html = '<div class="space-y-3">';
+        for (const [name, m] of Object.entries(res)) {
+            const train = m.train || {};
+            const test  = m.test  || {};
+            const over  = m.overfitting_warning;
+            html += `
+            <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <p class="font-bold text-gray-800 mb-2 text-sm">${name}</p>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="bg-white rounded p-2 border border-gray-100">
+                        <p class="text-gray-400 font-semibold mb-1">Treino</p>
+                        <p>MAE: <span class="font-mono font-medium">${(train.MAE||0).toFixed(2)}</span></p>
+                        <p>RMSE: <span class="font-mono font-medium">${(train.RMSE||0).toFixed(2)}</span></p>
+                        <p>R²: <span class="font-mono font-medium">${(train.R2||0).toFixed(3)}</span></p>
+                    </div>
+                    <div class="bg-white rounded p-2 border border-gray-100">
+                        <p class="text-gray-400 font-semibold mb-1">Teste</p>
+                        <p>MAE: <span class="font-mono font-medium">${(test.MAE||0).toFixed(2)}</span></p>
+                        <p>RMSE: <span class="font-mono font-medium">${(test.RMSE||0).toFixed(2)}</span></p>
+                        <p>R²: <span class="font-mono font-medium">${(test.R2||0).toFixed(3)}</span></p>
+                    </div>
+                </div>
+                ${over ? '<p class="text-xs text-amber-600 mt-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Overfitting warning</p>' : ''}
+                ${m.model_path ? `<p class="text-xs text-gray-400 mt-1 font-mono">${m.model_path}</p>` : ''}
+            </div>`;
+        }
+        html += '</div>';
+        results.innerHTML = html;
+        results.classList.remove('hidden');
+    } catch(e) {
+        termLog(term, `  [ERRO] ${e.message}`, 'error');
+    }
+}
+
+/* ─────────────────────────────────────────────────────
+   7. VER MÉTRICAS
+───────────────────────────────────────────────────── */
+async function runMetrics() {
+    const password = document.getElementById('metrics-password').value;
+    const term     = document.getElementById('metrics-terminal');
+    const results  = document.getElementById('metrics-results');
+
+    termClear(term);
+    results.classList.add('hidden');
+    results.innerHTML = '';
+
+    if (!password) { termLog(term, '  [ERRO] Confirma a tua password.', 'error'); return; }
+
+    termLog(term, '  [INFO] A verificar credenciais...', 'info');
+    termLog(term, '  [INFO] A carregar métricas guardadas...', 'info');
+
+    try {
+        const r = await fetch('/api/metrics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        const d = await r.json();
+
+        if (d.error) { termLog(term, `  [ERRO] ${d.error}`, 'error'); return; }
+
+        const metrics = d.metrics || {};
+        if (!Object.keys(metrics).length) {
+            termLog(term, '  [WARN] Ainda não há métricas. Treina primeiro os modelos.', 'warn');
+            return;
+        }
+
+        termLog(term, '  [OK]   Métricas carregadas.', 'ok');
+
+        let html = '<div class="space-y-3">';
+        for (const [modelName, entries] of Object.entries(metrics)) {
+            const last3 = entries.slice(-3);
+            html += `<div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <p class="font-bold text-gray-800 mb-3 text-sm">${modelName}</p>`;
+            last3.forEach(entry => {
+                const ts      = entry.timestamp || '?';
+                const mTrain  = entry.metrics?.train || {};
+                const mTest   = entry.metrics?.test  || {};
+                const maeRatio  = mTrain.MAE  > 0 ? mTest.MAE  / mTrain.MAE  : 0;
+                const rmseRatio = mTrain.RMSE > 0 ? mTest.RMSE / mTrain.RMSE : 0;
+                const over      = maeRatio > 2.5 && rmseRatio > 2.5;
+                html += `
+                <div class="mb-2 pb-2 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0">
+                    <p class="text-xs text-gray-400 font-mono mb-1">${ts}</p>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                            <p class="text-gray-400 font-semibold">Treino</p>
+                            <p>MAE: <span class="font-mono">${(mTrain.MAE||0).toFixed(2)}</span>
+                               RMSE: <span class="font-mono">${(mTrain.RMSE||0).toFixed(2)}</span>
+                               R²: <span class="font-mono">${(mTrain.R2||0).toFixed(3)}</span>
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 font-semibold">Teste</p>
+                            <p>MAE: <span class="font-mono">${(mTest.MAE||0).toFixed(2)}</span>
+                               RMSE: <span class="font-mono">${(mTest.RMSE||0).toFixed(2)}</span>
+                               R²: <span class="font-mono">${(mTest.R2||0).toFixed(3)}</span>
+                            </p>
+                        </div>
+                    </div>
+                    ${over ? '<p class="text-xs text-amber-600 mt-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Overfitting warning</p>' : ''}
+                </div>`;
+            });
+            html += '</div>';
+        }
+        html += '</div>';
+        results.innerHTML = html;
+        results.classList.remove('hidden');
+    } catch(e) {
+        termLog(term, `  [ERRO] ${e.message}`, 'error');
+    }
+}
+
+/* ─────────────────────────────────────────────────────
+   8. GERAR PREVISÃO
+───────────────────────────────────────────────────── */
+async function runPrediction() {
+    const password = document.getElementById('pred-password').value;
+    const nHours   = document.getElementById('pred-nhours').value || 24;
+    const term     = document.getElementById('pred-terminal');
+    const results  = document.getElementById('pred-results');
+    const predTable= document.getElementById('pred-table');
+    const predTiming = document.getElementById('pred-timing');
+
+    termClear(term);
+    results.classList.add('hidden');
+
+    if (!password) { termLog(term, '  [ERRO] Confirma a tua password.', 'error'); return; }
+
+    termLog(term, '  [INFO] A verificar credenciais...', 'info');
+    termLog(term, `  [INFO] A carregar dataset (últimas ${nHours}h)...`, 'info');
+    termLog(term, '  [INFO] A correr modelo de previsão...', 'info');
+
+    try {
+        const t0 = performance.now();
+        const r  = await fetch('/api/predict_admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password, n_last: parseInt(nHours) })
+        });
+        const d = await r.json();
+        const elapsed = ((performance.now() - t0) / 1000).toFixed(4);
+
+        if (d.error) { termLog(term, `  [ERRO] ${d.error}`, 'error'); return; }
+
+        termLog(term, `  [OK]   Previsões geradas com sucesso em ${elapsed}s.`, 'ok');
+        termLog(term, `         Modelo: ${d.model || '?'}  |  Pontos: ${d.n_samples || 0}`, 'dim');
+
+        if (parseFloat(elapsed) < 1.0) {
+            termLog(term, '  [OK]   Tempo de resposta inferior a 1 segundo.', 'ok');
+        } else {
+            termLog(term, '  [WARN] A previsão ultrapassou 1 segundo localmente.', 'warn');
+        }
+
+        const preds = d.predictions || [];
+        const tss   = d.timestamps  || [];
+        const slice = preds.slice(0, 10);
+        let html = `<table class="w-full text-xs border-collapse">
+            <thead><tr class="bg-gray-50">
+                <th class="px-3 py-2 text-left font-semibold text-gray-500 border-b border-gray-200">Timestamp</th>
+                <th class="px-3 py-2 text-right font-semibold text-gray-500 border-b border-gray-200">Previsão (MW)</th>
+            </tr></thead><tbody>`;
+        slice.forEach((p, i) => {
+            html += `<tr class="${i%2===0?'':'bg-gray-50/60'}">
+                <td class="px-3 py-1.5 font-mono text-gray-500 border-b border-gray-100">${tss[i] || '—'}</td>
+                <td class="px-3 py-1.5 font-mono font-medium text-right text-energy-600 border-b border-gray-100">${p.toFixed(2)}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        predTable.innerHTML = html;
+        predTiming.textContent = `Tempo total: ${elapsed}s`;
+        results.classList.remove('hidden');
+    } catch(e) {
+        termLog(term, `  [ERRO] ${e.message}`, 'error');
+    }
+}
+
+/* ─────────────────────────────────────────────────────
+   PIPELINE (ingestão / cleaning / feature engineering)
+───────────────────────────────────────────────────── */
+async function runPipeline(step) {
+    const termIds = { ingestion: 'ingestion-terminal', cleaning: 'cleaning-terminal', features: 'feateng-terminal' };
+    const labels  = { ingestion: 'Ingestão', cleaning: 'Cleaning', features: 'Feature Engineering' };
+    const term = document.getElementById(termIds[step]);
+
+    termClear(term);
+    termLog(term, `  [INFO] A iniciar ${labels[step]}...`, 'info');
+
+    const warnings = {
+        ingestion: [
+            [4000,  '  [INFO] A descarregar dados ENTSO-E...'],
+            [8000,  '  [INFO] A processar ficheiro ERA5 (GRIB)... pode demorar 3-5 min.'],
+            [60000, '  [INFO] Ainda a processar ERA5, por favor aguarda...'],
+            [180000,'  [INFO] Quase a terminar o processamento ERA5...'],
+        ],
+        cleaning:  [[3000, '  [INFO] A processar e unir datasets...']],
+        features:  [[3000, '  [INFO] A calcular features avançadas...']],
+    };
+    const timers = (warnings[step] || []).map(([ms, msg]) =>
+        setTimeout(() => termLog(term, msg, 'info'), ms)
+    );
+
+    try {
+        const r = await fetch(`/api/pipeline/${step}`, { method: 'POST' });
+        timers.forEach(clearTimeout);
+        const d = await r.json();
+        if (d.error) { termLog(term, `  [ERRO] ${d.error}`, 'error'); return; }
+        termLog(term, `  [OK]   ${d.message || labels[step] + ' concluído.'}`, 'ok');
+    } catch(e) {
+        timers.forEach(clearTimeout);
+        termLog(term, `  [ERRO] ${e.message}`, 'error');
+    }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "admin": {
+    "password": "$2b$12$YbjrXtH0LBZTpjmYqQlTMuc/ytglp2roWhdu2.FYNBWRnpzpXh50q",
+    "role": "admin"
+  },
+  "madalena13": {
+    "password": "$2b$12$sf1lFzOBd5HQzYYwBz5kq.SnCWJTy77AE2ieiEm7UO7eI.tPFI0t6",
+    "role": "user"
+  },
+  "user": {
+    "password": "$2b$12$lF7C2gvfzZM9gRrAp7.4O.d51xLtSXkqNKIwptQowEtCHp3H2OP0G",
+    "role": "user"
+  }
+}
