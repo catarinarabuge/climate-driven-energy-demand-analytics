@@ -1,0 +1,19 @@
+# Application dependencies
+pandas
+numpy
+bcrypt
+python-dotenv
+scikit-learn
+joblib
+entsoe-py
+cdsapi
+xarray
+cfgrib
+flask
+
+# Testing and CI tools
+pytest
+pytest-cov
+flake8
+xenon
+bandit
