@@ -1,313 +1,246 @@
 # Climate-Driven Energy Demand Analytics System
 
-Academic group project developed for the Project in Artificial Intelligence and Data Science course.
+Academic group project developed for the **Project in Artificial Intelligence and Data Science** course, as part of the Bachelor's Degree in Data Engineering and Data Science at the University of Coimbra.
 
-A modular AI-driven software system that uses publicly available climate data to model and predict national electricity demand in **Portugal**. Built for the PIACD 2025/2026 course at the Department of Informatics Engineering, University of Coimbra.
+This project explores how publicly available climate data can help explain and predict national electricity demand in Portugal. The system integrates electricity demand data with climate variables, applies data cleaning and feature engineering, trains predictive models, and provides prediction functionality through both a Flask web application and a command-line interface.
 
-The system integrates real-world hourly electricity load data from the **ENTSO-E Transparency Platform** with **ERA5 climate data** from the Copernicus Climate Data Store, exposes prediction functionality through both a Command Line Interface and a Flask web application, and enforces authentication on all sensitive operations.
+## Overview
 
----
+Electricity demand is influenced by several external factors, including weather conditions, seasonality and daily consumption patterns. This project focuses on analysing the relationship between climate variables and electricity load, using a modular AI-driven system designed to support data ingestion, processing, modelling, evaluation and prediction.
 
-## 1. Research Question
+The main research question is:
 
 **How can publicly available climate data explain and predict national electricity demand in Portugal?**
 
-Sub-questions:
-- To what extent do temperature, solar radiation, and wind speed influence electricity load?
-- Can climate variables improve short-term electricity demand forecasting accuracy?
-- Which engineered features contribute most to predictive performance?
+Sub-questions explored in the project include:
 
----
+* To what extent do temperature, solar radiation and wind speed influence electricity load?
+* Can climate variables improve short-term electricity demand forecasting?
+* Which engineered features contribute most to predictive performance?
 
-## 2. Selected Country and Data Sources
+## Main Features
 
-- **Country:** Portugal
-- **Electricity demand:** ENTSO-E Transparency Platform — total hourly electricity load (MW), one full year of 2025 data
-- **Climate data:** ERA5 (Copernicus Climate Data Store) — 2-meter temperature, 10-meter wind component, surface solar radiation, total precipitation, all at hourly resolution
-- **Alignment:** climate and electricity data are merged on the same hourly timestamps in UTC
+* Data ingestion from public electricity and climate data sources
+* Cleaning and temporal alignment of energy and weather datasets
+* Feature engineering with temporal, lagged and climate-based features
+* Training and evaluation of predictive models
+* Time-aware train/test split
+* Model evaluation using MAE, RMSE and R²
+* Prediction functionality through a Flask web application
+* Command-line interface for data exploration, training and prediction
+* Authentication and role-based access control
+* Logging of relevant system actions
+* Unit tests for important components
+* Documentation of architecture, use cases and quality attributes
 
----
+## Data Sources
 
-## 3. Running the System
+The project was designed to combine:
 
-The system has two interfaces — a **Flask web application** (`app.py`) and a **Command Line Interface** (`cli.py`) — and two user roles (**regular user** and **admin**) with different capabilities.
+* **Electricity demand data:** ENTSO-E Transparency Platform
+* **Climate data:** ERA5 dataset from the Copernicus Climate Data Store
 
-### 3.1 Initial Setup (do once)
+The final dataset aligns hourly electricity demand observations with climate variables for the same time period.
 
-This section walks you through everything you need to do once before launching the system. By the end, you'll be able to run either the web app or the CLI.
+Main climate variables considered:
 
-#### Step 1 — Install Python
+* 2-meter air temperature
+* solar radiation
+* 10-meter wind speed
+* precipitation, when available
 
-If you don't already have Python installed, download Python 3.11 or newer from [python.org/downloads](https://www.python.org/downloads/). During installation on Windows, make sure to tick the box that says **"Add Python to PATH"**.
+## Models and Evaluation
 
-To check it's installed, open a terminal and run:
+The project includes both a baseline model and a more flexible machine learning model.
 
-```bash
-python --version
+Models used:
+
+* Linear Regression
+* Random Forest Regressor
+
+Evaluation metrics:
+
+* MAE — Mean Absolute Error
+* RMSE — Root Mean Squared Error
+* R² — Coefficient of Determination
+
+Since the data has a temporal structure, model evaluation was performed using a time-aware train/test split instead of random shuffling.
+
+## Key Results
+
+The system was evaluated using Portuguese electricity demand data aligned with ERA5 climate data.
+
+The best-performing configuration achieved strong predictive performance with the Linear Regression model, showing that engineered temporal and climate-related features were useful for explaining demand patterns.
+
+Example results from the project documentation:
+
+| Model             |  Test MAE | Test RMSE | Test R² | Overfitting Flag |
+| ----------------- | --------: | --------: | ------: | ---------------- |
+| Linear Regression | 256.79 MW | 319.19 MW |   0.931 | No               |
+| Random Forest     | 342.16 MW | 486.98 MW |   0.839 | No               |
+
+Key observations:
+
+* Linear Regression achieved the best test performance in the final configuration.
+* Time-aware evaluation was used to better reflect real forecasting conditions.
+* Climate-aware and temporal features contributed to predictive performance.
+* Model evaluation considered both accuracy and generalisation.
+
+## Technologies
+
+* Python
+* pandas
+* NumPy
+* scikit-learn
+* Flask
+* HTML
+* pytest
+* bcrypt
+* python-dotenv
+* Git / GitLab CI
+
+## Repository Structure
+
+```text
+.
+├── README.md
+├── ARCHITECTURE.md
+├── QUALITY_ATTRIBUTES.md
+├── USE_CASES.md
+├── app.py
+├── cli.py
+├── api.py
+├── auth_service.py
+├── advanced_features.py
+├── base_features.py
+├── merge_datasets.py
+├── model_training.py
+├── model_utils.py
+├── predict.py
+├── prediction_service.py
+├── entsoe_client.py
+├── era5.py
+├── create_admin.py
+├── conftest.py
+├── test_auth.py
+├── test_cleaning.py
+├── test_era5.py
+├── test_evaluation.py
+├── test_features.py
+├── test_ingestion.py
+├── test_model_training.py
+├── test_predict.py
+├── admin.html
+├── user.html
+├── landing_page.html
+└── requirements.txt
 ```
 
-You should see something like `Python 3.11.x`. If you get an error, restart your terminal or computer after installing.
+## Documentation
 
-#### Step 2 — Get the code
+Additional documentation files are included in the repository:
 
-Open a terminal in the folder where you want to keep the project, then run:
+* `ARCHITECTURE.md` — system architecture, components and data flow
+* `USE_CASES.md` — structured use cases
+* `QUALITY_ATTRIBUTES.md` — performance, reliability and security considerations
+
+## Running the Project
+
+### 1. Clone the repository
 
 ```bash
-git clone <repo-url>
-cd pl1g3
+git clone https://github.com/catarinarabuge/climate-driven-energy-demand-analytics.git
+cd climate-driven-energy-demand-analytics
 ```
 
-If you don't have `git`, you can also download the project as a ZIP file from GitLab and unzip it.
-
-#### Step 3 — Install the project's dependencies
-
-The project relies on several Python libraries (Flask for the web app, pandas for data handling, scikit-learn for models, etc.). Install them all in one go:
+### 2. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-This may take a couple of minutes the first time. You only need to do it once.
-
-#### Step 4 — Create a `.env` file (optional)
-
-Some parts of the system need configuration values that should not be saved in the public code (like API keys). These go in a file called `.env` at the root of the project.
-
-**You don't need to set anything to use the web app or the CLI as a regular user or admin.** All the data is already in the `data/processed/` folder, the models are in `models/`, and the system has a working development default for everything else.
-
-You only need a `.env` file if you want to run the **data ingestion** step, which downloads fresh data from the internet. In that case, create a file called exactly `.env` in the project root and add:
-
-```
-ENTSOE_API_KEY=your_entsoe_token_here
-CDSAPI_KEY=your_uid:your_key_here
-```
-
-These are free tokens you can request from:
-- **ENTSO-E**: register at https://transparency.entsoe.eu/, then request an API token in your account settings
-- **Copernicus** (for climate data): register at https://cds.climate.copernicus.eu/, then find your UID and API key on your profile page
-
-If you just want to log in, view data, train models, or generate predictions, you can skip this step entirely.
-
-#### Step 5 — (Optional) Create an admin account
-
-By default the system has no admin user. If you want to test the admin features (running the pipeline, training models, viewing metrics, promoting users), create one with:
-
-```bash
-python create_admin.py
-```
-
-If you don't run this, you can still create regular-user accounts through the normal registration form.
-
-#### You're ready. Now choose how to use the system:
-
-**To launch the web app:**
+### 3. Run the Flask web application
 
 ```bash
 python app.py
 ```
 
-Then open your browser at **http://127.0.0.1:5001**. Stop the server with `Ctrl+C` in the terminal.
-
-**To launch the CLI:**
-
-```bash
-python cli.py
-```
-
-The CLI runs in your terminal — no browser needed. Stop it with `Ctrl+C` or the "Sair" option.
-
-Both interfaces share the same users, the same trained models, and the same activity log. An account created in one works in the other.
-
----
-
-### 3.2 Running as a Regular User
-
-A regular user is a non-admin account. After registering through either the landing page or the CLI registration menu, regular users have read-only access to data exploration and the prediction interface.
-
-**Through the web app:**
-
-1. Open `http://127.0.0.1:5001` and click **Registar** (Register) to create an account, or **Login** if you already have one.
-2. After logging in, you are taken to the **Painel de Previsão** (forecast page) at `/forecast`. This is the regular-user prediction interface.
-3. On the prediction page:
-   - Select which features you want to control through clickable chips (hour, temperature, season, wind, etc.). Any feature you don't select uses a historical default.
-   - Adjust values through sliders, toggles, and presets.
-   - Click **Gerar Previsão** to generate a prediction. The system returns a point prediction, a 24-hour load curve, and a 90% confidence interval.
-4. Log out through the **Sair** button in the top right.
-
-**Through the CLI:**
-
-```bash
-python cli.py
-```
-
-The welcome screen offers three options: **Login**, **Registar novo utilizador**, or **Sair**. After logging in as a regular user you land in the user menu, which offers:
-
-1. **Explorar dados de um dia (energia + clima)** — view raw energy and weather data for a chosen date and hour
-2. **Explorar features calculadas** — view the engineered features that feed into the model
-3. **Gerar previsão** — pick a saved model, choose the number of recent hours to predict on, and view the predictions (the CLI prompts for your password as a re-authentication step and warns if the prediction takes more than 1 second)
-4. **Ver métricas / resultados** — view the historical metrics of all training runs (MAE, RMSE, R²) — also requires password re-confirmation
-5. **Logout**
-
----
-
-### 3.3 Running as an Admin
-
-An admin has all the regular-user capabilities plus the ability to drive the full data pipeline, train models, and promote other users. New registrations always create regular users; admins must be either seeded (`create_admin.py`) or promoted by another admin.
-
-**Through the web app:**
-
-1. Open `http://127.0.0.1:5001` and log in with admin credentials.
-2. After logging in, you are taken to `/dashboard`, which serves the **Painel de Administração** with ten action cards:
-   1. **Explorar Dados** — energy and climate data exploration for a chosen date/hour
-   2. **Explorar Features** — view the engineered features
-   3. **Ingestão de Dados** — run the ENTSO-E + ERA5 ingestion (requires `.env` with API keys)
-   4. **Cleaning & Alinhamento** — clean and merge raw datasets
-   5. **Feature Engineering** — generate base (v1) and advanced (v2) features
-   6. **Treinar Modelos** — train Linear Regression + Random Forest (requires password re-confirmation)
-   7. **Ver Métricas** — view stored metrics from previous training runs (requires password re-confirmation)
-   8. **Gerar Previsão** — opens the scenario-based prediction page
-   9. **Promover a Admin** — promote another user to admin
-   10. **Logout**
-
-**Through the CLI:**
-
-```bash
-python cli.py
-```
-
-Log in as an admin. The admin menu offers all the regular-user options plus pipeline and admin-only actions:
-
-1. **Explorar dados de um dia (energia + clima)**
-2. **Explorar features calculadas**
-3. **Ingestão de dados** — run the full ingestion pipeline
-4. **Cleaning e alinhamento**
-5. **Feature engineering**
-6. **Treinar modelos** — admin only, prompts for password re-confirmation, trains both models and shows train/test MAE, RMSE, R², and the overfitting flag
-7. **Ver métricas / resultados**
-8. **Gerar previsão**
-9. **Promover utilizador a admin**
-10. **Logout**
-
----
-
-## 4. System Architecture
-
-The system is built as modular components with a clear separation of concerns:
-
-- **Data Ingestion** — retrieves raw data from ENTSO-E and ERA5
-- **Cleaning & Alignment** — produces consistent hourly time series
-- **Feature Engineering** — generates base and advanced predictive features
-- **Modeling** — trains Linear Regression (baseline) and a regularised Random Forest
-- **Prediction Interface** — exposes predictions through CLI and web
-- **Authentication Layer** — gates all sensitive operations
-- **Application Service Layer** — mediates between user interfaces and the modeling subsystem
-- **CLI** and **Flask Web App** — two complementary interaction layers
-
-For the full architecture, see [`Architecture/ARCHITECTURE.md`](Architecture/ARCHITECTURE.md).
-
----
-
-## 5. Repository Structure
+Then open:
 
 ```text
-.
-├── Code/                       # Source code (auth, ingestion, cleaning, features, modeling, interface)
-├── Architecture/               # ARCHITECTURE.md
-├── Requirements/               # USE_CASES.md, QUALITY_ATTRIBUTES.md
-├── Design/                     # Web templates (admin.html, user.html, landing_page.html)
-├── Testing/                    # Unit tests (pytest)
-├── data/
-│   ├── raw/{energy,weather}/   # Original datasets
-│   └── processed/              # Cleaned, aligned, and engineered datasets
-├── models/                     # Trained model artifacts + model_metrics.json
-├── Management/                 # Team profiles
-├── app.py                      # Flask web application
-├── cli.py                      # Command line interface
-├── conftest.py                 # Pytest configuration
-├── create_admin.py             # Development helper to seed an admin account
-├── users.json                  # Hashed user credentials
-├── system_actions.log          # Logged system events
-├── .gitlab-ci.yml              # CI pipeline (5 stages)
-└── README.md
+http://127.0.0.1:5001
 ```
 
----
+### 4. Run the command-line interface
 
-## 6. Documentation Map
+```bash
+python cli.py
+```
 
-- **System architecture and components** → [`Architecture/ARCHITECTURE.md`](Architecture/ARCHITECTURE.md)
-- **Structured use cases** → [`Requirements/USE_CASES.md`](Requirements/USE_CASES.md)
-- **Structured quality attributes** → [`Requirements/QUALITY_ATTRIBUTES.md`](Requirements/QUALITY_ATTRIBUTES.md)
+## Configuration
 
----
+Some parts of the original academic system require API keys to retrieve fresh data from external sources. These credentials should be stored locally in a `.env` file and must not be committed to the repository.
 
-## 7. Performance Measurements
+Example:
 
-The system measures execution time for the most relevant components and enforces a strict latency budget on predictions:
+```text
+ENTSOE_API_KEY=your_entsoe_token_here
+CDSAPI_KEY=your_uid:your_key_here
+```
 
-- **Advanced feature engineering** — logs total duration to `system_actions.log`
-- **Model training** — logged in both CLI (`elapsed=X.XXs`) and as part of the web `/api/train` JSON response
-- **Prediction (CLI and web)** — measured per request; the CLI warns when latency exceeds 1 second
-- **Automated 1-second budget enforcement** — the GitLab CI `prediction_performance` job re-runs an end-to-end timing check on every push and fails the build if a prediction takes 1 second or more
+For the public portfolio version, private configuration files, credentials, logs, large datasets and trained model artifacts are not included.
 
-Detailed performance scenarios and limitations are documented in [`Requirements/QUALITY_ATTRIBUTES.md`](Requirements/QUALITY_ATTRIBUTES.md) §2.
+## Testing
 
----
+The project includes unit tests for several components, including authentication, data cleaning, feature generation, model training, prediction and data ingestion.
 
-## 8. Security Considerations
+To run the tests:
 
-The system enforces several security measures:
+```bash
+pytest
+```
 
-- **Password hashing** with bcrypt, never plaintext, with an 8-character minimum length enforced at registration
-- **No hardcoded credentials** in the repository; API keys and the Flask `SECRET_KEY` are loaded from environment variables; `.env` is git-ignored
-- **Authentication required** for every sensitive operation: pipeline execution, training, metrics inspection, prediction, and admin promotion
-- **Role-based access control** (user vs admin) on both CLI and web
-- **Password re-confirmation** on the web app before training and metrics inspection, on top of the session cookie
-- **Static security scanning** with `bandit` runs in CI on every push
-- **Action logging** in `system_actions.log` records authentication attempts and all modeling actions with timestamps and usernames
+## Security and Reliability
 
-Known limitations: the development fallback `SECRET_KEY`, the basic level of input validation, and the lack of session-token authentication are documented in [`Requirements/QUALITY_ATTRIBUTES.md`](Requirements/QUALITY_ATTRIBUTES.md) §6.
+The project includes several basic security and reliability measures:
 
----
+* password hashing with bcrypt;
+* minimum password length requirement;
+* role-based access control;
+* authentication required for sensitive operations;
+* environment variables for private credentials;
+* no hardcoded API keys in the public repository;
+* input validation where appropriate;
+* unit tests for normal and failure scenarios.
 
-## 9. Reliability Strategies
+## Public Repository Note
 
-The system handles failures gracefully:
+This repository is a public portfolio version of an academic group project. Large datasets, trained model artifacts, logs, local configuration files and private credentials are not included.
 
-- **Missing or incomplete data** → forward/backward filling, duplicate removal, full-hourly reindexing
-- **External API failures** → caught and logged; no internal stack traces exposed
-- **Invalid authentication** → access denied with a generic message; attempt logged
-- **Optional dependencies** (`cdsapi`, `cfgrib`) → defensive imports so the system runs even when not installed
-- **Unit tests** cover normal paths, edge cases, and failure scenarios (missing files, empty datasets, missing columns, invalid credentials, missing API keys)
-- **GitLab CI** validates every push with five stages: unit tests, code style/complexity, smoke imports, coverage (≥85% on `Code/`), security scanning, and prediction-latency enforcement. The build fails if any stage fails.
+The goal of this repository is to present the project structure, main implementation files, documentation and testing approach in a clean and safe way for portfolio purposes.
 
----
+## Academic Context
 
-## 10. Key Findings
+**Course:** Project in Artificial Intelligence and Data Science
+**Degree:** Bachelor's Degree in Data Engineering and Data Science
+**University:** University of Coimbra / FCTUC
+**Academic Year:** 2025/2026
 
-The system was trained and evaluated end-to-end on the 2025 Portuguese electricity demand dataset aligned with ERA5 climate data. Latest results stored in `models/model_metrics.json`:
+## What I Learned
 
-| Model                       | Train MAE | Train RMSE | Train R² | Test MAE | Test RMSE | Test R² | Overfitting flag |
-|-----------------------------|-----------|------------|----------|----------|-----------|---------|------------------|
-| Linear Regression           | 212.87    | 282.66     | 0.928    | 256.79   | 319.19    | 0.931   | No               |
-| Random Forest (regularised) | 164.50    | 278.05     | 0.930    | 342.16   | 486.98    | 0.839   | No               |
+This project helped develop skills in:
 
-*All errors in MW; R² unitless.*
+* working with real-world energy and climate data;
+* preparing and aligning time-series datasets;
+* creating predictive features from temporal and climate variables;
+* training and evaluating machine learning models;
+* interpreting results using appropriate metrics;
+* designing modular data science software;
+* understanding the importance of authentication, testing, reliability and security in AI-driven systems;
+* documenting a complete data science project.
 
-**Key observations:**
-- Linear Regression is the more accurate model on test data in the current configuration (test MAE ≈ 257 MW, test R² ≈ 0.93). The train/test metrics are very close, indicating clean generalisation.
-- The Random Forest has been strongly regularised (`max_depth=12`, `min_samples_leaf=50`, `min_samples_split=100`, `max_features='sqrt'`). Earlier unconstrained configurations achieved lower test errors (~112 MW MAE) but were flagged by the overfitting heuristic because train MAE was four times smaller than test MAE. The current configuration trades absolute accuracy for a "no overfitting" verdict.
-- Climate-aware features (rolling temperature, lagged load, season encoding, feels-like temperature) are the principal driver of predictive power: the linear baseline alone reaches a test R² above 0.93 using only the engineered feature set.
-- The time-aware split (no shuffling) ensures the reported test errors reflect true forward-prediction behaviour, not in-sample fitting.
+## Status
 
----
+Academic project completed.
 
-## 11. Git Workflow
-
-- No direct commits to `main`
-- Each issue is implemented in a branch named `<issueID>-short-description`
-- Every change goes through a Merge Request reviewed by at least one teammate before merging
-- The GitLab CI pipeline must pass before a merge is accepted
-
----
 
