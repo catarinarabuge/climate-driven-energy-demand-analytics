@@ -1,6 +1,7 @@
 # Climate-Driven Energy Demand Analytics System
 
 Academic group project developed for the Project in Artificial Intelligence and Data Science course.
+
 A modular AI-driven software system that uses publicly available climate data to model and predict national electricity demand in **Portugal**. Built for the PIACD 2025/2026 course at the Department of Informatics Engineering, University of Coimbra.
 
 The system integrates real-world hourly electricity load data from the **ENTSO-E Transparency Platform** with **ERA5 climate data** from the Copernicus Climate Data Store, exposes prediction functionality through both a Command Line Interface and a Flask web application, and enforces authentication on all sensitive operations.
